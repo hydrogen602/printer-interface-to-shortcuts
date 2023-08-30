@@ -5,15 +5,27 @@ mod printer_service;
 mod printer_trait;
 mod time_utils;
 
-use actix_web::{get, web, App, HttpServer, Responder};
+use actix_web::{get, web, App, HttpServer};
 use std::sync::Arc;
 
 use http_errors::AnyhowInternalServerError;
 use printer_trait::Printer;
 
 #[get("/job")]
-async fn job_status(printer: web::Data<dyn Printer>) -> Result<String, AnyhowInternalServerError> {
-    let job_state = printer.job_state().await?;
+async fn job_status(
+    printer: web::Data<dyn Printer>,
+    req: actix_web::HttpRequest,
+) -> Result<String, AnyhowInternalServerError> {
+    let api_key = req
+        .headers()
+        .get("X-Api-Key")
+        .ok_or_else(|| {
+            AnyhowInternalServerError(anyhow::anyhow!("X-Api-Key header not found in request"))
+        })?
+        .to_str()
+        .map_err(anyhow::Error::from)?;
+
+    let job_state = printer.job_state(api_key).await?;
 
     let percent = (job_state.progress.completion).round() as i32;
 
@@ -23,8 +35,18 @@ async fn job_status(printer: web::Data<dyn Printer>) -> Result<String, AnyhowInt
         .unwrap()
         .to_human_readable_briefly();
 
+    if percent == 100 {
+        let time_taken = time_utils::Time::from_seconds(job_state.progress.print_time)
+            .unwrap()
+            .to_human_readable_briefly();
+        return Ok(format!(
+            "Finished printing {}. Printing took {}",
+            job_state.job.file.name, time_taken
+        ));
+    }
+
     Ok(format!(
-        "Currently printing {}, which is {}% complete. Time left is {}",
+        "Currently printing {}, which is {}% complete. Printing is expected to finish in {}",
         job_state.job.file.name, percent, time_left
     ))
 }

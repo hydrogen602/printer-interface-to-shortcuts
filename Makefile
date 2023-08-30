@@ -24,7 +24,13 @@
 # 	ssh -t octopi RUST_BACKTRACE=1 ./printer-actions
 
 copy:
-	rsync -r . octopi:~/printer-actions
+	rsync -r src Cargo.toml Cargo.lock octopi:~/printer-actions
+
+remote-run:
+	ssh -t octopi "cd ~/printer-actions && RUST_BACKTRACE=1 cargo run"
+
+spawn:
+	ssh octopi "cd ~/printer-actions && nohup cargo run &"
 
 clippy:
 	__CARGO_FIX_YOLO=1 cargo clippy --fix --allow-staged 
