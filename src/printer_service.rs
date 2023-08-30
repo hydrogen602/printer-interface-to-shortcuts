@@ -167,7 +167,7 @@ impl Printer for PrinterService {
     async fn prepare_remove_filament(&self, api_key: &str) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
         ensure!(
-            state.state.flags.operational == true,
+            state.state.flags.operational,
             "Printer not operational"
         );
 
@@ -178,7 +178,7 @@ impl Printer for PrinterService {
     async fn retract_filament(&self, api_key: &str) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
         ensure!(
-            state.state.flags.operational == true,
+            state.state.flags.operational,
             "Printer not operational"
         );
         // TODO: put temp config into config file
@@ -193,7 +193,7 @@ impl Printer for PrinterService {
     async fn feed_filament(&self, api_key: &str) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
         ensure!(
-            state.state.flags.operational == true,
+            state.state.flags.operational,
             "Printer not operational"
         );
         // TODO: put temp config into config file
@@ -208,7 +208,7 @@ impl Printer for PrinterService {
     async fn cool_down(&self, api_key: &str) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
         ensure!(
-            state.state.flags.operational == true,
+            state.state.flags.operational,
             "Printer not operational"
         );
 
