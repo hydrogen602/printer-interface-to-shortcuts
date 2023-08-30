@@ -1,7 +1,7 @@
 use crate::data_defs::{printer_job_state::JobState, printer_state::PrinterState};
 
 #[async_trait::async_trait]
-pub trait Printer {
+pub trait Printer: Send + Sync {
     async fn printer_state(&self) -> anyhow::Result<PrinterState>;
     async fn prepare_remove_filament(&self) -> anyhow::Result<()>;
     async fn retract_filament(&self) -> anyhow::Result<()>;

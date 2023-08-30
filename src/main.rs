@@ -1,23 +1,47 @@
 mod data_defs;
+mod http_errors;
+mod interface_data_defs;
 mod printer_service;
 mod printer_trait;
+mod time_utils;
 
+use actix_web::{get, web, App, HttpServer, Responder};
+use std::sync::Arc;
+
+use http_errors::AnyhowInternalServerError;
 use printer_trait::Printer;
 
-// use actix_web::{get, web, App, HttpServer, Responder};
+#[get("/job")]
+async fn job_status(printer: web::Data<dyn Printer>) -> Result<String, AnyhowInternalServerError> {
+    let job_state = printer.job_state().await?;
 
-// #[get("/")]
-// async fn greet() -> impl Responder {
-//     format!("Hello World!")
-// }
+    let percent = (job_state.progress.completion).round() as i32;
 
-// #[actix_web::main] // or #[tokio::main]
-// async fn main() -> std::io::Result<()> {
-//     HttpServer::new(|| App::new().service(greet))
-//         .bind(("127.0.0.1", 8080))?
-//         .run()
-//         .await
-// }
+    let seconds_left = job_state.progress.print_time_left;
+
+    let time_left = time_utils::Time::from_seconds(seconds_left)
+        .unwrap()
+        .to_human_readable_briefly();
+
+    Ok(format!(
+        "Currently printing {}, which is {}% complete. Time left is {}",
+        job_state.job.file.name, percent, time_left
+    ))
+}
+
+#[actix_web::main] // or #[tokio::main]
+async fn main() -> std::io::Result<()> {
+    let printer: Arc<dyn Printer> = Arc::new(printer_service::PrinterService::new());
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::from(printer.clone()))
+            .service(job_status)
+    })
+    .bind(("0.0.0.0", 5001))?
+    .run()
+    .await
+}
 
 // #[tokio::main]
 // async fn main() {
