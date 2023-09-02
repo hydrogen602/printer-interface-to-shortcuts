@@ -1,10 +1,13 @@
 #![allow(dead_code)]
-use crate::data_defs::printer_move::PrinterMove;
-use crate::data_defs::printer_tool::{Targets, Tool};
-use crate::{data_defs::printer_state::PrinterState, printer_trait::Printer};
 use anyhow::ensure;
 use log::debug;
 use reqwest::header::{self, HeaderMap};
+
+use super::error_util::LogInvalidJson;
+use crate::data_defs::printer_job_action::JobAction;
+use crate::data_defs::printer_move::PrinterMove;
+use crate::data_defs::printer_tool::{Targets, Tool};
+use crate::{data_defs::printer_state::PrinterState, printer_trait::Printer};
 
 fn get_default_headers(api_key: &str) -> HeaderMap {
     let mut h = header::HeaderMap::new();
@@ -47,7 +50,7 @@ impl PrinterService {
             .send()
             .await?
             .error_for_status()?
-            .json()
+            .json_log_if_invalid()
             .await?;
         Ok(resp)
     }
@@ -202,6 +205,7 @@ impl Printer for PrinterService {
 
     async fn cool_down(&self, api_key: &str) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
+        // TODO: replace with something returning 409 (Conflict)
         ensure!(state.state.flags.operational, "Printer not operational");
 
         self._cool_down(api_key).await
@@ -212,5 +216,10 @@ impl Printer for PrinterService {
         api_key: &str,
     ) -> anyhow::Result<crate::data_defs::printer_job_state::JobState> {
         self.get("job", api_key).await
+    }
+
+    async fn cancel_job(&self, api_key: &str) -> anyhow::Result<()> {
+        self.post_no_response("job", JobAction::Cancel, api_key)
+            .await
     }
 }

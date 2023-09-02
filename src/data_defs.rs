@@ -230,7 +230,7 @@ pub mod printer_job_action {
     }
 
     #[test]
-    fn test_move() {
+    fn test_job_change() {
         let move_ = JobAction::Start;
         let cmd = serde_json::to_string(&move_).unwrap();
         assert_eq!(cmd, r#"{"command":"start"}"#);

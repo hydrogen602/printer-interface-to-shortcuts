@@ -8,4 +8,5 @@ pub trait Printer: Send + Sync {
     async fn feed_filament(&self, api_key: &str) -> anyhow::Result<()>;
     async fn cool_down(&self, api_key: &str) -> anyhow::Result<()>;
     async fn job_state(&self, api_key: &str) -> anyhow::Result<JobState>;
+    async fn cancel_job(&self, api_key: &str) -> anyhow::Result<()>;
 }

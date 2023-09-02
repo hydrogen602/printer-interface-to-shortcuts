@@ -1,41 +1,28 @@
 mod data_defs;
-mod http_errors;
-mod interface_data_defs;
-mod logging_util;
-mod printer_service;
 mod printer_trait;
-mod time_utils;
+mod remote;
+mod utils;
 
-use actix_web::{get, web, App, HttpServer};
+use actix_web::{delete, get, web, App, HttpServer};
 use log::{info, LevelFilter};
-use logging_util::LoggableResult;
 use simple_logger::SimpleLogger;
 use std::sync::Arc;
 
-use http_errors::AnyhowHTTPError;
 use printer_trait::Printer;
+use utils::http_errors::AnyhowHTTPError;
+use utils::logging_util::LoggableResult;
+use utils::time_utils;
 
 #[get("/job")]
 async fn job_status(
     printer: web::Data<dyn Printer>,
     req: actix_web::HttpRequest,
 ) -> Result<String, AnyhowHTTPError> {
-    let api_key = req
-        .headers()
-        .get("X-Api-Key")
-        .ok_or_else(|| {
-            AnyhowHTTPError::Unauthorized401("X-Api-Key header not found in request".to_string())
-        })
-        .log_warn()?
-        .to_str()
-        .map_err(anyhow::Error::from)?;
-
+    let api_key = utils::get_api_key(&req)?;
     let job_state = printer.job_state(api_key).await.log_error()?;
 
     let percent = (job_state.progress.completion).round() as i32;
-
     let seconds_left = job_state.progress.print_time_left;
-
     let time_left = time_utils::Time::from_seconds(seconds_left)
         .unwrap()
         .to_human_readable_briefly();
@@ -56,6 +43,18 @@ async fn job_status(
     ))
 }
 
+#[delete("/job")]
+async fn cancel_job(
+    printer: web::Data<dyn Printer>,
+    req: actix_web::HttpRequest,
+) -> Result<String, AnyhowHTTPError> {
+    let api_key = utils::get_api_key(&req)?;
+
+    // the printer will return an error if there is no job to cancel (409)
+    printer.cancel_job(api_key).await.log_error()?;
+    Ok("Cancelling print job".to_string())
+}
+
 #[actix_web::main] // or #[tokio::main]
 async fn main() -> std::io::Result<()> {
     SimpleLogger::new()
@@ -63,13 +62,14 @@ async fn main() -> std::io::Result<()> {
         .init()
         .unwrap();
 
-    let printer: Arc<dyn Printer> = Arc::new(printer_service::PrinterService::new());
+    let printer: Arc<dyn Printer> = Arc::new(remote::printer_service::PrinterService::new());
 
     info!("Starting server");
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::from(printer.clone()))
             .service(job_status)
+            .service(cancel_job)
     })
     .bind(("0.0.0.0", 5001))?
     .run()
