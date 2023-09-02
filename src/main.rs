@@ -1,31 +1,36 @@
 mod data_defs;
 mod http_errors;
 mod interface_data_defs;
+mod logging_util;
 mod printer_service;
 mod printer_trait;
 mod time_utils;
 
 use actix_web::{get, web, App, HttpServer};
+use log::{info, LevelFilter};
+use logging_util::LoggableResult;
+use simple_logger::SimpleLogger;
 use std::sync::Arc;
 
-use http_errors::AnyhowInternalServerError;
+use http_errors::AnyhowHTTPError;
 use printer_trait::Printer;
 
 #[get("/job")]
 async fn job_status(
     printer: web::Data<dyn Printer>,
     req: actix_web::HttpRequest,
-) -> Result<String, AnyhowInternalServerError> {
+) -> Result<String, AnyhowHTTPError> {
     let api_key = req
         .headers()
         .get("X-Api-Key")
         .ok_or_else(|| {
-            AnyhowInternalServerError(anyhow::anyhow!("X-Api-Key header not found in request"))
-        })?
+            AnyhowHTTPError::Unauthorized401("X-Api-Key header not found in request".to_string())
+        })
+        .log_warn()?
         .to_str()
         .map_err(anyhow::Error::from)?;
 
-    let job_state = printer.job_state(api_key).await?;
+    let job_state = printer.job_state(api_key).await.log_error()?;
 
     let percent = (job_state.progress.completion).round() as i32;
 
@@ -53,8 +58,14 @@ async fn job_status(
 
 #[actix_web::main] // or #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    SimpleLogger::new()
+        .with_level(LevelFilter::Info)
+        .init()
+        .unwrap();
+
     let printer: Arc<dyn Printer> = Arc::new(printer_service::PrinterService::new());
 
+    info!("Starting server");
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::from(printer.clone()))

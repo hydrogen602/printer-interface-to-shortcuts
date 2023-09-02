@@ -3,6 +3,7 @@ use crate::data_defs::printer_move::PrinterMove;
 use crate::data_defs::printer_tool::{Targets, Tool};
 use crate::{data_defs::printer_state::PrinterState, printer_trait::Printer};
 use anyhow::ensure;
+use log::debug;
 use reqwest::header::{self, HeaderMap};
 
 fn get_default_headers(api_key: &str) -> HeaderMap {
@@ -29,6 +30,7 @@ impl PrinterService {
             .get("http://octoprint.local/api/version")
             .send()
             .await?
+            .error_for_status()?
             .text()
             .await?;
         Ok(resp)
@@ -44,6 +46,7 @@ impl PrinterService {
             .headers(get_default_headers(api_key))
             .send()
             .await?
+            .error_for_status()?
             .json()
             .await?;
         Ok(resp)
@@ -65,9 +68,10 @@ impl PrinterService {
             .json(&payload)
             .send()
             .await?
+            .error_for_status()?
             .text()
             .await?;
-        println!("{}", resp);
+        debug!("{}", resp);
         Ok(())
     }
 }
@@ -166,10 +170,7 @@ impl Printer for PrinterService {
 
     async fn prepare_remove_filament(&self, api_key: &str) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
-        ensure!(
-            state.state.flags.operational,
-            "Printer not operational"
-        );
+        ensure!(state.state.flags.operational, "Printer not operational");
 
         self.move_print_head_high(api_key).await?;
         self.hot_end_for_pla(api_key).await
@@ -177,10 +178,7 @@ impl Printer for PrinterService {
 
     async fn retract_filament(&self, api_key: &str) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
-        ensure!(
-            state.state.flags.operational,
-            "Printer not operational"
-        );
+        ensure!(state.state.flags.operational, "Printer not operational");
         // TODO: put temp config into config file
         ensure!(
             state.temperature.tool0.actual > 200.,
@@ -192,10 +190,7 @@ impl Printer for PrinterService {
 
     async fn feed_filament(&self, api_key: &str) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
-        ensure!(
-            state.state.flags.operational,
-            "Printer not operational"
-        );
+        ensure!(state.state.flags.operational, "Printer not operational");
         // TODO: put temp config into config file
         ensure!(
             state.temperature.tool0.actual > 200.,
@@ -207,10 +202,7 @@ impl Printer for PrinterService {
 
     async fn cool_down(&self, api_key: &str) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
-        ensure!(
-            state.state.flags.operational,
-            "Printer not operational"
-        );
+        ensure!(state.state.flags.operational, "Printer not operational");
 
         self._cool_down(api_key).await
     }

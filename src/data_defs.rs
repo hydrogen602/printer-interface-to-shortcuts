@@ -208,3 +208,57 @@ pub mod printer_job_state {
         pub print_time_left: i64,
     }
 }
+
+pub mod printer_job_action {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase", tag = "command")]
+    pub enum JobAction {
+        Start,
+        Cancel,
+        Restart,
+        Pause { action: PauseAction },
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub enum PauseAction {
+        Pause,
+        Resume,
+        Toggle,
+    }
+
+    #[test]
+    fn test_move() {
+        let move_ = JobAction::Start;
+        let cmd = serde_json::to_string(&move_).unwrap();
+        assert_eq!(cmd, r#"{"command":"start"}"#);
+
+        let move_ = JobAction::Cancel;
+        let cmd = serde_json::to_string(&move_).unwrap();
+        assert_eq!(cmd, r#"{"command":"cancel"}"#);
+
+        let move_ = JobAction::Restart;
+        let cmd = serde_json::to_string(&move_).unwrap();
+        assert_eq!(cmd, r#"{"command":"restart"}"#);
+
+        let move_ = JobAction::Pause {
+            action: PauseAction::Pause,
+        };
+        let cmd = serde_json::to_string(&move_).unwrap();
+        assert_eq!(cmd, r#"{"command":"pause","action":"pause"}"#);
+
+        let move_ = JobAction::Pause {
+            action: PauseAction::Resume,
+        };
+        let cmd = serde_json::to_string(&move_).unwrap();
+        assert_eq!(cmd, r#"{"command":"pause","action":"resume"}"#);
+
+        let move_ = JobAction::Pause {
+            action: PauseAction::Toggle,
+        };
+        let cmd = serde_json::to_string(&move_).unwrap();
+        assert_eq!(cmd, r#"{"command":"pause","action":"toggle"}"#);
+    }
+}
