@@ -17,7 +17,7 @@ where
         match serde_json::from_str(&contents) {
             Ok(json) => Ok(json),
             Err(e) => {
-                log::error!("Invalid JSON response: {}", e);
+                log::error!("Invalid JSON response:\n{}\nError: {}", contents, e);
                 Err(anyhow!(e))
             }
         }

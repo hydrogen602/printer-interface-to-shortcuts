@@ -1,12 +1,16 @@
 #![allow(dead_code)]
+
 use anyhow::ensure;
 use log::debug;
 use reqwest::header::{self, HeaderMap};
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 
 use super::error_util::LogInvalidJson;
 use crate::data_defs::printer_job_action::JobAction;
 use crate::data_defs::printer_move::PrinterMove;
 use crate::data_defs::printer_tool::{Targets, Tool};
+use crate::filaments::{Filament, HotEndTemperature};
 use crate::{data_defs::printer_state::PrinterState, printer_trait::Printer};
 
 fn get_default_headers(api_key: &str) -> HeaderMap {
@@ -17,6 +21,7 @@ fn get_default_headers(api_key: &str) -> HeaderMap {
 
 pub struct PrinterService {
     client: reqwest::Client,
+    pending_task: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl PrinterService {
@@ -24,7 +29,10 @@ impl PrinterService {
 
     pub fn new() -> Self {
         let client = reqwest::Client::builder().build().unwrap();
-        Self { client }
+        Self {
+            client: client,
+            pending_task: Mutex::new(None),
+        }
     }
 
     pub async fn version(&self) -> anyhow::Result<String> {
@@ -102,11 +110,13 @@ impl PrinterService {
         Ok(())
     }
 
-    async fn hot_end_for_pla(&self, api_key: &str) -> anyhow::Result<()> {
+    async fn hot_end(&self, api_key: &str, temperature: HotEndTemperature) -> anyhow::Result<()> {
         self.post_no_response(
             "printer/tool",
             Tool::Target {
-                targets: Targets { tool0: 210 },
+                targets: Targets {
+                    tool0: temperature.into(),
+                },
             },
             api_key,
         )
@@ -126,6 +136,25 @@ impl PrinterService {
         Ok(())
     }
 
+    /// This will block for a long time (10 min ish)
+    /// waits until hot-end is within 5 degrees of target
+    /// Polls every 10 seconds
+    async fn _wait_for_temperature(
+        &self,
+        api_key: &str,
+        target: HotEndTemperature,
+    ) -> anyhow::Result<()> {
+        loop {
+            let state = self.printer_state(api_key).await?;
+            if target.within_5_degrees_of(state.temperature.tool0.actual) {
+                break;
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        }
+        Ok(())
+    }
+
     async fn _retract_filament(&self, api_key: &str) -> anyhow::Result<()> {
         self.post_no_response(
             "printer/tool",
@@ -141,19 +170,19 @@ impl PrinterService {
     }
 
     async fn _feed_filament(&self, api_key: &str) -> anyhow::Result<()> {
+        // self.post_no_response(
+        //     "printer/tool",
+        //     Tool::Extrude {
+        //         amount: 300.0,
+        //         speed: Some(250.),
+        //     },
+        //     api_key,
+        // )
+        // .await?;
         self.post_no_response(
             "printer/tool",
             Tool::Extrude {
-                amount: 300.0,
-                speed: Some(250.),
-            },
-            api_key,
-        )
-        .await?;
-        self.post_no_response(
-            "printer/tool",
-            Tool::Extrude {
-                amount: 100.0,
+                amount: 500.0,
                 speed: Some(80.),
             },
             api_key,
@@ -171,34 +200,26 @@ impl Printer for PrinterService {
         self.get("printer", api_key).await
     }
 
-    async fn prepare_remove_filament(&self, api_key: &str) -> anyhow::Result<()> {
+    async fn retract_filament(&self, api_key: &str, filament: Filament) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
         ensure!(state.state.flags.operational, "Printer not operational");
 
+        self.hot_end(api_key, filament.into()).await?;
         self.move_print_head_high(api_key).await?;
-        self.hot_end_for_pla(api_key).await
-    }
 
-    async fn retract_filament(&self, api_key: &str) -> anyhow::Result<()> {
-        let state = self.printer_state(api_key).await?;
-        ensure!(state.state.flags.operational, "Printer not operational");
-        // TODO: put temp config into config file
-        ensure!(
-            state.temperature.tool0.actual > 200.,
-            "Hot end not hot enough"
-        );
+        self._wait_for_temperature(api_key, filament.into()).await?;
 
         self._retract_filament(api_key).await
     }
 
-    async fn feed_filament(&self, api_key: &str) -> anyhow::Result<()> {
+    async fn feed_filament(&self, api_key: &str, filament: Filament) -> anyhow::Result<()> {
         let state = self.printer_state(api_key).await?;
         ensure!(state.state.flags.operational, "Printer not operational");
-        // TODO: put temp config into config file
-        ensure!(
-            state.temperature.tool0.actual > 200.,
-            "Hot end not hot enough"
-        );
+
+        self.hot_end(api_key, filament.into()).await?;
+        self.move_print_head_high(api_key).await?;
+
+        self._wait_for_temperature(api_key, filament.into()).await?;
 
         self._feed_filament(api_key).await
     }

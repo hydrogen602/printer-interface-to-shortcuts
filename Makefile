@@ -29,8 +29,19 @@ copy:
 remote-run:
 	ssh -t octopi "cd ~/printer-actions && RUST_BACKTRACE=1 cargo run"
 
+kill-remote:
+	ssh octopi 'kill $$(pidof printer-actions)'
+
 spawn:
-	ssh octopi "kill $(pidof printer-actions); cd ~/printer-actions && nohup cargo run > run.log 2>&1 &"
+	ssh octopi 'cd ~/printer-actions && nohup cargo run > run.log 2>&1 &'
 
 clippy:
 	__CARGO_FIX_YOLO=1 cargo clippy --fix --allow-staged 
+
+run:
+	$(MAKE) copy 
+	$(MAKE) kill-remote 
+	$(MAKE) spawn
+
+read-log:
+	ssh -t octopi 'tail -f ~/printer-actions/run.log'
