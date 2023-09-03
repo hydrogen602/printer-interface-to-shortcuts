@@ -24,7 +24,7 @@
 # 	ssh -t octopi RUST_BACKTRACE=1 ./printer-actions
 
 copy:
-	rsync -r src Cargo.toml Cargo.lock octopi:~/printer-actions
+	rsync -r src Cargo.toml Cargo.lock .env octopi:~/printer-actions
 
 remote-run:
 	ssh -t octopi "cd ~/printer-actions && RUST_BACKTRACE=1 cargo run"
@@ -40,7 +40,7 @@ clippy:
 
 run:
 	$(MAKE) copy 
-	$(MAKE) kill-remote 
+	$(MAKE) kill-remote || echo "No process to kill"
 	$(MAKE) spawn
 
 read-log:

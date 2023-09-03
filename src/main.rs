@@ -1,17 +1,19 @@
 mod data_defs;
 mod filaments;
-mod printer_trait;
+mod job_checker;
 mod remote;
+mod traits;
 mod utils;
 
 use actix_web::{delete, get, post, web, App, HttpServer};
+use dotenv::dotenv;
 use filaments::Filament;
 use log::{info, LevelFilter};
 use serde::Deserialize;
 use simple_logger::SimpleLogger;
 use std::sync::Arc;
 
-use printer_trait::Printer;
+use traits::printer_trait::Printer;
 use utils::http_errors::AnyhowHTTPError;
 use utils::logging_util::LoggableResult;
 use utils::time_utils;
@@ -136,7 +138,26 @@ async fn main() -> std::io::Result<()> {
         .init()
         .unwrap();
 
-    let printer: Arc<dyn Printer> = Arc::new(remote::printer_service::PrinterService::new());
+    dotenv().log_error_and_panic_with_msg("Failed to load .env file");
+
+    let read_key: String =
+        std::env::var("API_READ_KEY").log_error_and_panic_with_msg("API_READ_KEY not set");
+
+    let client = reqwest::Client::builder().build().unwrap();
+
+    let printer: Arc<dyn Printer> =
+        Arc::new(remote::printer_service::PrinterService::new(client.clone()));
+
+    let printer_clone = printer.clone();
+    let _print_finish_notify = tokio::spawn(async move {
+        job_checker::job_checker(
+            printer_clone,
+            remote::notify_homebridge::NotifyHomebridge::new(client),
+            &read_key,
+        )
+        .await
+        .log_error()
+    });
 
     info!("Starting server");
     HttpServer::new(move || {

@@ -1,6 +1,8 @@
 {
   "cSpell.words": [
     "actix",
+    "dotenv",
+    "Homebridge",
     "Loggable",
     "reqwest",
     "Siri"

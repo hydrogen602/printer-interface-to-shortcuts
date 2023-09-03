@@ -3,15 +3,14 @@
 use anyhow::ensure;
 use log::debug;
 use reqwest::header::{self, HeaderMap};
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
+use reqwest::Client;
 
 use super::error_util::LogInvalidJson;
 use crate::data_defs::printer_job_action::JobAction;
 use crate::data_defs::printer_move::PrinterMove;
 use crate::data_defs::printer_tool::{Targets, Tool};
 use crate::filaments::{Filament, HotEndTemperature};
-use crate::{data_defs::printer_state::PrinterState, printer_trait::Printer};
+use crate::{data_defs::printer_state::PrinterState, traits::printer_trait::Printer};
 
 fn get_default_headers(api_key: &str) -> HeaderMap {
     let mut h = header::HeaderMap::new();
@@ -21,18 +20,13 @@ fn get_default_headers(api_key: &str) -> HeaderMap {
 
 pub struct PrinterService {
     client: reqwest::Client,
-    pending_task: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl PrinterService {
     const PREFIX: &'static str = "http://octoprint.local/api";
 
-    pub fn new() -> Self {
-        let client = reqwest::Client::builder().build().unwrap();
-        Self {
-            client: client,
-            pending_task: Mutex::new(None),
-        }
+    pub fn new(client: Client) -> Self {
+        Self { client }
     }
 
     pub async fn version(&self) -> anyhow::Result<String> {
