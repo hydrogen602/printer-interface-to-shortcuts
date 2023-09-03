@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Filament {
     PLA,
     PETG,

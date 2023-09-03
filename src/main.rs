@@ -40,7 +40,7 @@ async fn job_status(
 ) -> Result<String, AnyhowHTTPError> {
     let api_key = utils::get_api_key(&req)?;
     let job_state = printer.job_state(api_key).await.log_error()?;
-    let percent = (job_state.progress.completion).round() as i32;
+    let percent = (job_state.progress.completion.unwrap_or(0.)).round() as i32;
 
     if let Target::HttpSwitch = info.target {
         return Ok(if percent == 100 {
@@ -50,38 +50,58 @@ async fn job_status(
         });
     }
 
-    let time_left_msg = if let Some(seconds_left) = job_state.progress.print_time_left {
-        Some(
-            time_utils::Time::from_seconds(seconds_left)
-                .unwrap()
-                .to_human_readable_briefly(),
-        )
-    } else {
-        None
-    };
-
-    if percent == 100 {
-        let time_taken = time_utils::Time::from_seconds(job_state.progress.print_time)
+    let time_left = job_state.progress.print_time_left.map(|time| {
+        time_utils::Time::from_seconds(time)
             .unwrap()
-            .to_human_readable_briefly();
-        return Ok(format!(
-            "Finished printing {}. Printing took {}",
-            job_state.job.file.name, time_taken
-        ));
-    }
+            .to_human_readable_briefly()
+    });
 
-    Ok(match time_left_msg {
-        Some(time_left) => format!(
-            "Currently printing {}, which is {}% complete. Printing is expected to finish in {}",
-            job_state.job.file.name, percent, time_left
-        ),
-        None => {
-            format!(
-                "Currently printing {}, which is {}% complete",
-                job_state.job.file.name, percent
-            )
-        }
-    })
+    let time_taken = job_state.progress.print_time.map(|time| {
+        time_utils::Time::from_seconds(time)
+            .unwrap()
+            .to_human_readable_briefly()
+    });
+
+    Ok(
+        match (percent, time_left, time_taken, job_state.job.file.name) {
+            (100, _, Some(time_taken), Some(file_name)) => {
+                format!(
+                    "Finished printing {}. Printing took {}",
+                    file_name, time_taken
+                )
+            }
+            (100, _, Some(time_taken), None) => {
+                format!("Finished printing. Printing took {}", time_taken)
+            }
+            (100, _, None, Some(file_name)) => {
+                format!(
+                    "Finished printing {}. Printing took an unknown amount of time",
+                    file_name
+                )
+            }
+            (percent, Some(time_left), _, Some(file_name)) => {
+                format!(
+                    "Currently printing {}, which is {}% complete. Printing is expected to finish in {}",
+                    file_name, percent, time_left,
+                )
+            }
+            (percent, Some(time_left), _, None) => {
+                format!(
+                    "Currently printing, which is {}% complete. Printing is expected to finish in {}",
+                    percent, time_left,
+                )
+            }
+            (percent, None, _, Some(file_name)) => {
+                format!(
+                    "Currently printing {}, which is {}% complete",
+                    file_name, percent,
+                )
+            }
+            (percent, None, _, None) => {
+                format!("Currently printing, which is {}% complete", percent)
+            }
+        },
+    )
 }
 
 #[delete("/job")]

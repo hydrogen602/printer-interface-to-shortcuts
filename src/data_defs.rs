@@ -176,15 +176,17 @@ pub mod printer_job_state {
         pub estimated_print_time: Option<f64>,
         pub average_print_time: Option<f64>,
         pub filament: Option<Filament>,
+        pub last_print_time: Option<f64>,
+        pub user: Option<String>,
     }
 
     #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct File {
-        pub name: String,
-        pub origin: String,
-        pub size: i64,
-        pub date: i64,
+        pub name: Option<String>,
+        pub origin: Option<String>,
+        pub size: Option<i64>,
+        pub date: Option<i64>,
     }
 
     #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -203,9 +205,9 @@ pub mod printer_job_state {
     #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Progress {
-        pub completion: f64,
-        pub filepos: i64,
-        pub print_time: i64,
+        pub completion: Option<f64>,
+        pub filepos: Option<i64>,
+        pub print_time: Option<i64>,
         pub print_time_left: Option<i64>,
     }
 }
