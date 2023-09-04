@@ -32,6 +32,7 @@ enum Target {
     HttpSwitch,
 }
 
+/// if target == HttpSwitch, then it returns 1 for job active, 0 for job inactive
 #[get("/job")]
 async fn job_status(
     printer: web::Data<dyn Printer>,
@@ -40,13 +41,16 @@ async fn job_status(
 ) -> Result<String, AnyhowHTTPError> {
     let api_key = utils::get_api_key(&req)?;
     let job_state = printer.job_state(api_key).await.log_error()?;
-    let percent = (job_state.progress.completion.unwrap_or(0.)).round() as i32;
+    let percent = job_state.progress.completion.map(|c| c.round() as i32);
 
     if let Target::HttpSwitch = info.target {
-        return Ok(if percent == 100 {
-            "0".to_string()
-        } else {
-            "1".to_string()
+        return Ok(match percent {
+            // no job
+            None => "0".to_string(),
+            // job done
+            Some(100) => "0".to_string(),
+            // job in progress
+            Some(_) => "1".to_string(),
         });
     }
 
@@ -64,41 +68,44 @@ async fn job_status(
 
     Ok(
         match (percent, time_left, time_taken, job_state.job.file.name) {
-            (100, _, Some(time_taken), Some(file_name)) => {
+            (Some(100), _, Some(time_taken), Some(file_name)) => {
                 format!(
                     "Finished printing {}. Printing took {}",
                     file_name, time_taken
                 )
             }
-            (100, _, Some(time_taken), None) => {
+            (Some(100), _, Some(time_taken), None) => {
                 format!("Finished printing. Printing took {}", time_taken)
             }
-            (100, _, None, Some(file_name)) => {
+            (Some(100), _, None, Some(file_name)) => {
                 format!(
                     "Finished printing {}. Printing took an unknown amount of time",
                     file_name
                 )
             }
-            (percent, Some(time_left), _, Some(file_name)) => {
+            (Some(percent), Some(time_left), _, Some(file_name)) => {
                 format!(
                     "Currently printing {}, which is {}% complete. Printing is expected to finish in {}",
                     file_name, percent, time_left,
                 )
             }
-            (percent, Some(time_left), _, None) => {
+            (Some(percent), Some(time_left), _, None) => {
                 format!(
                     "Currently printing, which is {}% complete. Printing is expected to finish in {}",
                     percent, time_left,
                 )
             }
-            (percent, None, _, Some(file_name)) => {
+            (Some(percent), None, _, Some(file_name)) => {
                 format!(
                     "Currently printing {}, which is {}% complete",
                     file_name, percent,
                 )
             }
-            (percent, None, _, None) => {
+            (Some(percent), None, _, None) => {
                 format!("Currently printing, which is {}% complete", percent)
+            }
+            (None, _, _, _) => {
+                format!("Nothing is currently printing",)
             }
         },
     )

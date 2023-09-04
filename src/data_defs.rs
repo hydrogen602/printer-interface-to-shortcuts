@@ -192,7 +192,7 @@ pub mod printer_job_state {
     #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Filament {
-        pub tool0: Tool0,
+        pub tool0: Option<Tool0>,
     }
 
     #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

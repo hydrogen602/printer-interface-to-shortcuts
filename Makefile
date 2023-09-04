@@ -44,4 +44,4 @@ run:
 	$(MAKE) spawn
 
 read-log:
-	ssh -t octopi 'tail -f ~/printer-actions/run.log'
+	ssh -t octopi 'tail -n 30 -f ~/printer-actions/run.log'
