@@ -1,5 +1,6 @@
 pub mod http_errors;
 pub mod logging_util;
+pub mod retry_on_fail;
 pub mod time_utils;
 
 use http_errors::AnyhowHTTPError;

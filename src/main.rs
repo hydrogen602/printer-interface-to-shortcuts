@@ -16,6 +16,7 @@ use std::sync::Arc;
 use traits::printer_trait::Printer;
 use utils::http_errors::AnyhowHTTPError;
 use utils::logging_util::LoggableResult;
+use utils::retry_on_fail::retry_on_fail;
 use utils::time_utils;
 
 #[derive(Deserialize, Debug)]
@@ -176,15 +177,44 @@ async fn main() -> std::io::Result<()> {
         Arc::new(remote::printer_service::PrinterService::new(client.clone()));
 
     let printer_clone = printer.clone();
-    let _print_finish_notify = tokio::spawn(async move {
-        job_checker::job_checker(
-            printer_clone,
-            remote::notify_homebridge::NotifyHomebridge::new(client),
-            &read_key,
-        )
-        .await
-        .log_error()
-    });
+    let client_clone = client.clone();
+    let read_key_clone = read_key.clone();
+
+    let job_check = move || {
+        let printer_clone2 = printer_clone.clone();
+        let client_clone2 = client_clone.clone();
+        let read_key_clone2 = read_key_clone.clone();
+
+        async move {
+            job_checker::job_checker(
+                printer_clone2,
+                remote::notify_homebridge::NotifyHomebridge::new(client_clone2),
+                &read_key_clone2,
+            )
+            .await
+        }
+    };
+    let _print_finish_notify = tokio::spawn(retry_on_fail(job_check));
+
+    // let _print_finish_notify = tokio::spawn(async move {
+    //     loop {
+    //         match job_checker::job_checker(
+    //             printer_clone.clone(),
+    //             remote::notify_homebridge::NotifyHomebridge::new(client_clone.clone()),
+    //             &read_key,
+    //         )
+    //         .await
+    //         .log_error()
+    //         {
+    //             Err(e) => {
+    //                 log::error!("Error: {}\nrestarting job_checker...", e);
+    //             }
+    //             Ok(t) => {
+    //                 break t;
+    //             }
+    //         };
+    //     }
+    // });
 
     info!("Starting server");
     HttpServer::new(move || {
