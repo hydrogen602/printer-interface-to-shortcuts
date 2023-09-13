@@ -15,3 +15,22 @@ Provides a simple interface to complex common actions via the octoprint API
 `read-log` - Reads the log file from the process spawned by `run`
 
 `kill-remote` - Kills the existing process on the octoprint server
+
+### Service
+
+To setup it to run as a service with systemd, run
+```bash
+sudo ln -s "$(pwd)/printer-actions.service" /etc/systemd/system/
+```
+in the folder where all the files are located. 
+Then run 
+```bash
+sudo systemctl daemon-reload
+```
+to load the new service. **This needs to be done every time the service file changes**
+To enable it, start it, and check on it:
+```bash
+sudo systemctl enable printer-actions.service
+sudo systemctl start printer-actions.service
+sudo systemctl status printer-actions.service
+```

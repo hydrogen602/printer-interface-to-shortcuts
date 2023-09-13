@@ -1,0 +1,12 @@
+[Unit]
+Description=3D Printer Integration Service
+After=multi-user.target network.target
+
+[Service]
+Type=simple
+ExecStart=/home/jonathan/printer-actions/launch.sh
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
