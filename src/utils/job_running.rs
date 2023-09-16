@@ -1,8 +1,6 @@
-use std::{borrow::BorrowMut, fmt::Display, future::Future};
+use std::future::Future;
 
 use tokio::task::JoinHandle;
-
-use crate::data_defs::printer_job_state::Job;
 
 use super::http_errors::AnyhowHTTPError;
 
