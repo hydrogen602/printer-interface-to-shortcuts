@@ -1,7 +1,10 @@
 .PHONY: clippy remote-run
 
 copy:
-	rsync -r src Cargo.toml Cargo.lock .env printer-actions.service launch.sh octopi:~/printer-actions
+	rsync -r src build.rs Cargo.toml Cargo.lock .env launch.sh launch2.sh octopi:~/printer-actions
+
+copy-service:
+	rsync -r printer-actions.service octopi:~/printer-actions
 
 # remote-run:
 # 	ssh -t octopi "cd ~/printer-actions && RUST_BACKTRACE=1 cargo run"
@@ -15,8 +18,16 @@ copy:
 clippy:
 	__CARGO_FIX_YOLO=1 cargo clippy --fix --allow-staged 
 
-# run:
-# 	$(MAKE) copy 
+restart:
+	ssh -t octopi 'sudo systemctl restart printer-actions.service'
+
+compile:
+	ssh -t octopi 'cd ~/printer-actions && cargo build'
+
+run:
+	$(MAKE) copy 
+	$(MAKE) compile
+	$(MAKE) restart
 # 	$(MAKE) kill-remote || echo "No process to kill"
 # 	$(MAKE) spawn
 

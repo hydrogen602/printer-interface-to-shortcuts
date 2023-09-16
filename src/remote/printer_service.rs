@@ -183,7 +183,6 @@ impl PrinterService {
         )
         .await?;
 
-        self.cool_down(api_key).await?;
         Ok(())
     }
 }
@@ -199,6 +198,7 @@ impl Printer for PrinterService {
         ensure!(state.state.flags.operational, "Printer not operational");
 
         self.hot_end(api_key, filament.into()).await?;
+        self.home_all(api_key).await?;
         self.move_print_head_high(api_key).await?;
 
         self._wait_for_temperature(api_key, filament.into()).await?;
@@ -211,6 +211,7 @@ impl Printer for PrinterService {
         ensure!(state.state.flags.operational, "Printer not operational");
 
         self.hot_end(api_key, filament.into()).await?;
+        self.home_all(api_key).await?;
         self.move_print_head_high(api_key).await?;
 
         self._wait_for_temperature(api_key, filament.into()).await?;

@@ -8,6 +8,8 @@ pub enum AnyhowHTTPError {
     InternalServerError500(String),
     #[error("Unauthorized 401: {0}")]
     Unauthorized401(String),
+    #[error("Conflict 409: {0}")]
+    Conflict409(String),
     #[error("HTTPError: {code} {message}")]
     AnyHTTPError { code: u16, message: String },
 }
@@ -18,6 +20,7 @@ impl actix_web::error::ResponseError for AnyhowHTTPError {
             Self::InternalServerError500(e) => {
                 actix_web::HttpResponse::InternalServerError().body(e.clone())
             }
+            Self::Conflict409(e) => actix_web::HttpResponse::Conflict().body(e.clone()),
             Self::Unauthorized401(e) => actix_web::HttpResponse::Unauthorized().body(e.clone()),
             Self::AnyHTTPError { code, message } => actix_web::HttpResponse::build(
                 actix_web::http::StatusCode::from_u16(*code).unwrap(),

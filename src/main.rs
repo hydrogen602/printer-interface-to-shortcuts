@@ -5,19 +5,26 @@ mod remote;
 mod traits;
 mod utils;
 
-use actix_web::{delete, get, post, web, App, HttpServer};
+use actix_web::{delete, get, post, web, App, HttpServer, Responder};
+use anyhow::anyhow;
 use dotenv::dotenv;
 use filaments::Filament;
 use log::{info, LevelFilter};
 use serde::Deserialize;
 use simple_logger::SimpleLogger;
+use std::borrow::BorrowMut;
+use std::mem;
 use std::sync::Arc;
+// use tokio::task::JoinHandle;
+use utils::job_running::{run_job, JobStatus, LongRunningJob};
 
 use traits::printer_trait::Printer;
 use utils::http_errors::AnyhowHTTPError;
 use utils::logging_util::LoggableResult;
 use utils::retry_on_fail::retry_on_fail;
 use utils::time_utils;
+
+const BUILD_TIME: &str = include!(concat!(env!("OUT_DIR"), "/timestamp.txt"));
 
 #[derive(Deserialize, Debug)]
 struct Opts {
@@ -132,31 +139,87 @@ struct FilamentOpts {
 #[delete("/filament")]
 async fn remove_filament(
     printer: web::Data<dyn Printer>,
+    long_running_job_tracker: web::Data<tokio::sync::Mutex<LongRunningJob>>,
     req: actix_web::HttpRequest,
     info: web::Query<FilamentOpts>,
 ) -> Result<String, AnyhowHTTPError> {
-    let api_key = utils::get_api_key(&req)?;
+    let api_key = utils::get_api_key(&req)?.to_string();
 
-    printer
-        .retract_filament(api_key, info.filament)
-        .await
-        .log_error()?;
-    Ok("Removing filament".to_string())
+    let mut long_running_job = long_running_job_tracker.lock().await;
+
+    run_job(
+        async move {
+            printer
+                .retract_filament(&api_key, info.filament)
+                .await
+                .map(|_| "Finished removing filament".to_string())
+                .log_error()
+        },
+        long_running_job.borrow_mut(),
+    )?;
+
+    Ok("Job started".to_string())
 }
 
 #[post("/filament")]
 async fn feed_filament(
     printer: web::Data<dyn Printer>,
+    long_running_job_tracker: web::Data<tokio::sync::Mutex<LongRunningJob>>,
     req: actix_web::HttpRequest,
     info: web::Query<FilamentOpts>,
 ) -> Result<String, AnyhowHTTPError> {
-    let api_key = utils::get_api_key(&req)?;
+    let api_key = utils::get_api_key(&req)?.to_string();
 
-    printer
-        .feed_filament(api_key, info.filament)
-        .await
-        .log_error()?;
-    Ok("Feeding filament".to_string())
+    let mut long_running_job = long_running_job_tracker.lock().await;
+
+    run_job(
+        async move {
+            printer
+                .feed_filament(&api_key, info.filament)
+                .await
+                .map(|_| "Finished feeding filament".to_string())
+                .log_error()
+        },
+        long_running_job.borrow_mut(),
+    )?;
+
+    Ok("Job started".to_string())
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct ServerInfo {
+    build_time: &'static str,
+    job_status: JobStatus,
+}
+
+#[get("/server-info")]
+async fn server_info(
+    long_running_job_tracker: web::Data<tokio::sync::Mutex<LongRunningJob>>,
+) -> Result<impl Responder, AnyhowHTTPError> {
+    let mut long_running_job = long_running_job_tracker.lock().await;
+    // let x = long_running_job.job.unwrap().try_into().unwrap();
+
+    let status = match &long_running_job.job {
+        None => JobStatus::NoJob,
+        Some(job) if job.is_finished() => {
+            // we by now verified that the job exists and is finished
+            let job_output = mem::take(&mut long_running_job.job)
+                .unwrap()
+                .await
+                .log_error()
+                .map_err(|e| anyhow!(e))?;
+
+            job_output.into()
+        }
+        Some(_) => JobStatus::Running,
+    };
+
+    let result = ServerInfo {
+        build_time: BUILD_TIME,
+        job_status: status,
+    };
+
+    Ok(web::Json(result))
 }
 
 #[actix_web::main] // or #[tokio::main]
@@ -175,6 +238,8 @@ async fn main() -> std::io::Result<()> {
 
     let printer: Arc<dyn Printer> =
         Arc::new(remote::printer_service::PrinterService::new(client.clone()));
+
+    let long_running_job_tracker = Arc::new(tokio::sync::Mutex::new(LongRunningJob { job: None }));
 
     let printer_clone = printer.clone();
     let client_clone = client.clone();
@@ -220,10 +285,12 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::from(printer.clone()))
+            .app_data(web::Data::from(long_running_job_tracker.clone()))
             .service(job_status)
             .service(cancel_job)
             .service(remove_filament)
             .service(feed_filament)
+            .service(server_info)
     })
     .bind(("0.0.0.0", 5001))?
     .run()
