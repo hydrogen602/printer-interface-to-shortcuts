@@ -261,27 +261,7 @@ async fn main() -> std::io::Result<()> {
     };
     let _print_finish_notify = tokio::spawn(retry_on_fail(job_check));
 
-    // let _print_finish_notify = tokio::spawn(async move {
-    //     loop {
-    //         match job_checker::job_checker(
-    //             printer_clone.clone(),
-    //             remote::notify_homebridge::NotifyHomebridge::new(client_clone.clone()),
-    //             &read_key,
-    //         )
-    //         .await
-    //         .log_error()
-    //         {
-    //             Err(e) => {
-    //                 log::error!("Error: {}\nrestarting job_checker...", e);
-    //             }
-    //             Ok(t) => {
-    //                 break t;
-    //             }
-    //         };
-    //     }
-    // });
-
-    info!("Starting server");
+    info!("Starting server with version {}", env!("CARGO_PKG_VERSION"));
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::from(printer.clone()))
@@ -296,25 +276,3 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
-
-// #[tokio::main]
-// async fn main() {
-//     let printer = printer_service::PrinterService::new();
-//     // let response = printer.version().await.unwrap();
-//     // println!("{}", response);
-//     let state = printer.printer_state().await.unwrap();
-//     println!("{:?}", state);
-
-//     let job = printer.job_state().await.unwrap();
-//     println!("{:?}", job);
-
-//     // // printer.home_all().await.unwrap();
-
-//     // printer.retract_filament().await.unwrap();
-//     // printer.remove_filament().await.unwrap();
-//     // printer.feed_filament().await.unwrap();
-//     // printer.cool_down().await.unwrap();
-
-//     // let x = printer.printer_state().await.unwrap();
-//     // println!("{:?}", x);
-// }
