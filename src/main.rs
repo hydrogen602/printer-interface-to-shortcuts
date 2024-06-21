@@ -1,28 +1,24 @@
-mod data_defs;
-mod filaments;
-mod job_checker;
-mod remote;
-mod traits;
-mod utils;
-
 use actix_web::{delete, get, post, web, App, HttpServer, Responder};
 use anyhow::anyhow;
 use dotenv::dotenv;
-use filaments::Filament;
 use log::{info, LevelFilter};
+use printer_actions::filaments::Filament;
 use serde::Deserialize;
 use simple_logger::SimpleLogger;
 use std::borrow::BorrowMut;
 use std::mem;
 use std::sync::Arc;
 // use tokio::task::JoinHandle;
-use utils::job_running::{run_job, JobStatus, LongRunningJob};
 
-use traits::printer_trait::Printer;
-use utils::http_errors::AnyhowHTTPError;
-use utils::logging_util::LoggableResult;
-use utils::retry_on_fail::retry_on_fail;
-use utils::time_utils;
+use printer_actions::job_checker;
+use printer_actions::remote;
+use printer_actions::traits::printer_trait::Printer;
+use printer_actions::utils;
+use printer_actions::utils::http_errors::AnyhowHTTPError;
+use printer_actions::utils::job_running::{run_job, JobStatus, LongRunningJob};
+use printer_actions::utils::logging_util::LoggableResult;
+use printer_actions::utils::retry_on_fail::retry_on_fail;
+use printer_actions::utils::time_utils;
 
 const BUILD_TIME: &str = include!(concat!(env!("OUT_DIR"), "/timestamp.txt"));
 

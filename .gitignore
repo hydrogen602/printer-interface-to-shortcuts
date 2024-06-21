@@ -1,3 +1,4 @@
 target
 .env
 notes.md
+.DS_Store

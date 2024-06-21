@@ -1,4 +1,4 @@
-.PHONY: clippy remote-run
+.PHONY: clippy copy copy-service restart
 
 copy:
 	rsync -r src build.rs Cargo.toml Cargo.lock .env launch.sh launch2.sh octopi:~/printer-actions
