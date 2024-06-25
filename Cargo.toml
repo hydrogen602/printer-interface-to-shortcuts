@@ -2,7 +2,7 @@
 name = "printer-actions"
 version = "0.1.0"
 edition = "2021"
-build = "build.rs"
+default-run = "printer-actions"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,12 +10,12 @@ build = "build.rs"
 chrono = "0.4.31"
 
 [dependencies]
-actix-web = "4.3.1"
+actix-web = { version = "4.3.1", features = [] }
 anyhow = { version = "1.0.74", features = ["backtrace"] }
 async-trait = "0.1.73"
 dotenv = "0.15.0"
 log = { version = "0.4.20", features = ["std"] }
-reqwest = { version="0.11.20", features = ["json"] }
+reqwest = { version = "0.11.20", features = ["json"] }
 serde = { version = "1.0.183", features = ["derive"] }
 serde_json = "1.0.105"
 simple_logger = { version = "4.2.0", features = [] }

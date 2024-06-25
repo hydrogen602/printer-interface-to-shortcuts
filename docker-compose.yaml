@@ -1,0 +1,11 @@
+version: "3.1"
+
+services:
+  printer-actions:
+    image: hydrogen602/printer-actions
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 5001:5001

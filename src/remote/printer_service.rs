@@ -23,7 +23,7 @@ pub struct PrinterService {
 }
 
 impl PrinterService {
-    const PREFIX: &'static str = "http://octoprint.local/api";
+    const PREFIX: &'static str = "http://192.168.1.113/api";
 
     pub fn new(client: Client) -> Self {
         Self { client }
@@ -32,7 +32,7 @@ impl PrinterService {
     pub async fn version(&self) -> anyhow::Result<String> {
         let resp = self
             .client
-            .get("http://octoprint.local/api/version")
+            .get(format!("{}/version", PrinterService::PREFIX))
             .send()
             .await?
             .error_for_status()?
